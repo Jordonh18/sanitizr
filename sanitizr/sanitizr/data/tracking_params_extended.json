@@ -1,0 +1,91 @@
+{
+  "utm_parameters": [
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "utm_creative", "utm_placement", "utm_name", "utm_pubreferrer",
+    "utm_reader", "utm_cid", "utm_viz_id", "utm_kxconfid"
+  ],
+  "click_ids": [
+    "fbclid", "gclid", "ocid", "ncid", "mc_cid", "mc_eid", "wickedid", "ttclid",
+    "yclid", "dclid", "_hsenc", "_hsmi", "igshid", "mkt_tok", "clickid",
+    "msclkid", "twclid", "dicbo", "gbraid", "wbraid", "gbraid_tw", "gclsrc"
+  ],
+  "social_tracking": [
+    "soc_src", "soc_trk", "wt_mc", "WT.mc_id", "ref", "referrer", "src",
+    "WT.tsrc", "_ga", "ref_src", "ref_url", "ref_map", "referral_id",
+    "rb_clickid", "s_cid", "zanpid", "guccounter", "_openstat"
+  ],
+  "facebook": [
+    "__tn__", "h", "c", "e", "s", "fref", "__xts__", "locale", "hc_ref",
+    "hc_location", "_rdr", "__cft__", "hash", "comment_id", "fb_action_ids",
+    "fb_action_types", "fb_ref", "fb_source", "action_object_map",
+    "action_type_map", "action_ref_map"
+  ],
+  "linkedin": [
+    "trackingId", "trkEmail", "lipi", "lio", "licu", "trk", "trkCampaign",
+    "refId", "midToken", "midSig", "eid", "trkInfo", "originalReferer"
+  ],
+  "instagram": [
+    "igshid", "ig_rid", "ig_mid", "hl", "taken-by"
+  ],
+  "twitter_x": [
+    "twclid", "twsrc", "twcamp", "twterm", "twgr", "cxt", "cn", "refsrc",
+    "s", "t", "ref_src", "ref_url"
+  ],
+  "tiktok": [
+    "tt_content", "tt_medium", "tt_campaign", "_r", "checksum", "u_code",
+    "preview_pb", "language", "timestamp"
+  ],
+  "pinterest": [
+    "pp", "pin_campaign", "pin_contr", "pin_desc", "pin_create", "pin_tags"
+  ],
+  "youtube": [
+    "feature", "kw", "annotation_id", "src_vid", "gclid", "gclsrc"
+  ],
+  "amazon": [
+    "tag", "linkCode", "linkId", "ref_", "th", "psc", "keywords",
+    "ie", "qid", "sr", "ref", "pf_rd_r", "pf_rd_p", "pf_rd_s",
+    "pf_rd_t", "pf_rd_i", "pf_rd_m", "pd_rd_r", "pd_rd_w", "pd_rd_wg",
+    "asc_source", "ascsubtag", "asc_refurl", "asc_campaign", "_encoding",
+    "hvadid", "hvdev", "hvlocphy", "hvnetw", "hvpos", "hvqmt", "hvrand",
+    "hvtargid"
+  ],
+  "email_tracking": [
+    "eid", "erid", "etid", "ecid", "emid", "eaid", "epid", "esrc",
+    "email", "email_auth", "email_id", "mailchimp_id", "newsletter_id"
+  ],
+  "analytics": [
+    "_ga", "_gid", "_gat", "__utma", "__utmb", "__utmc", "__utmv", "__utmz",
+    "_dc_gtm_", "ga_", "gtm_", "_gcl_au", "_gcl_aw", "_gcl_dc", "_gcl_gb",
+    "_gcl_gf", "_gcl_ha", "_gcl_aw"
+  ],
+  "adobe": [
+    "sc_cid", "sc_lid", "sc_uid", "sc_llid", "sc_customer", "sc_country",
+    "sc_geo", "sc_outcome", "trackingId", "s_cid", "s_lid", "s_uid"
+  ],
+  "generic_tracking": [
+    "tracking", "source", "campaign", "sa", "sc", "tc", "data",
+    "affid", "affiliate", "aff", "cid", "cmpid", "cmp", "cp", "afftrack",
+    "camp", "campaign_id", "cmp_id", "cta_id", "promo", "promotion",
+    "device", "browser", "platform", "timestamp", "ts", "time",
+    "country", "region", "location", "geo", "lat", "lon", "latlon",
+    "adgroup", "adset", "adid", "ad_id", "creative", "placement",
+    "internal", "internal_ref", "flow", "flow_id", "journey",
+    "ctaLabel", "variant", "exp", "experiment", "ab_test", "feature",
+    "cmpgn", "mtype", "mkt", "medium", "orig", "origin", "channel"
+  ],
+  "affiliate_tracking": [
+    "aff_sub", "aff_sub2", "aff_sub3", "aff_sub4", "aff_sub5",
+    "sub_id", "sub_id_1", "sub_id_2", "sub_id_3", "sub_id_4", "sub_id_5",
+    "source_id", "affiliate_id", "partner_id", "referrer_id", "pub_id",
+    "offer_id", "campaign_id", "banner_id", "click_id", "transaction_id",
+    "aff_siteid", "aff_click_id", "aff_unique_id"
+  ],
+  "redirect_indicators": [
+    "url", "u", "redirect", "redir", "target", "goto", "link", "dest",
+    "next", "to", "out", "jump", "return", "continue", "follow",
+    "location", "href", "path", "navigate", "forward", "proceed",
+    "uri", "source", "destination", "r_url", "returnurl", "return_url",
+    "redirect_uri", "redirect_url", "redirecturl", "returnto",
+    "adurl", "ads_url", "ad_url", "data", "payload", "content", "encoded"
+  ]
+}
