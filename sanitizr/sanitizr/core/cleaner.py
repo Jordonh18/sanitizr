@@ -6,11 +6,15 @@ This module handles the core functionality of URL cleaning including:
 - Redirection decoding
 - Parameter whitelisting/blacklisting
 - Custom domain handling
+- Base64-encoded URL detection and decoding
+- Multi-level URL decoding
 """
 
 import re
+import json
+import base64
 import urllib.parse
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set, Union, Any, Tuple
 
 
 class URLCleaner:
@@ -34,6 +38,19 @@ class URLCleaner:
         "outer.com": ["url"],
         "middle.com": ["target"],
         "website.com": ["url"],  # For fragment test
+        
+        # Common ad and tracking providers
+        "adsprovider.net": ["redirect", "url", "goto", "link", "destination"],
+        "track.adsprovider.net": ["redirect", "url", "goto", "link", "destination", "data"],
+        "doubleclick.net": ["url", "adurl", "destination"],
+        "clickserve.dartsearch.net": ["ds_dest_url", "url"],
+        "adservice.google.com": ["url", "adurl"],
+        "ad.doubleclick.net": ["adurl", "url", "rd", "destination"],
+        "analytics.twitter.com": ["redirect", "url"],
+        "ads.linkedin.com": ["url", "destination"],
+        "ads.facebook.com": ["u", "url", "destination"],
+        "googleads.g.doubleclick.net": ["adurl", "url"],
+        "adsrv.org": ["u", "url", "redirect", "destination"],
     }
 
     # Regex patterns for extracting URLs from complex redirects
@@ -49,20 +66,64 @@ class URLCleaner:
 
     # Common tracking parameters to remove
     DEFAULT_TRACKING_PARAMS = {
-        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-        "fbclid", "gclid", "ocid", "ncid", "mc_cid", "mc_eid",
-        "yclid", "dclid", "_hsenc", "_hsmi", "igshid", "mkt_tok",
-        "soc_src", "soc_trk", "wt_mc", "WT.mc_id", "ref", "referrer",
-        "WT.tsrc", "_ga", "ref_src", "ref_url", "ref_map",
+        # UTM parameters
+        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", 
+        "utm_id", "utm_creative", "utm_placement", "utm_name", "utm_pubreferrer",
+        
+        # Click IDs
+        "fbclid", "gclid", "ocid", "ncid", "mc_cid", "mc_eid", "wickedid", "ttclid",
+        "yclid", "dclid", "_hsenc", "_hsmi", "igshid", "mkt_tok", "clickid",
+        "msclkid", "twclid", "dicbo", "gbraid", "wbraid", "gbraid_tw",
+        
+        # Session and visitor IDs
+        "sessionid", "session_id", "visitor_id", "visitorid", "visitor",
+        
+        # Social tracking
+        "soc_src", "soc_trk", "wt_mc", "WT.mc_id", "ref", "referrer", "src",
+        "WT.tsrc", "_ga", "ref_src", "ref_url", "ref_map", "referral_id",
         "rb_clickid", "s_cid", "zanpid", "guccounter", "_openstat",
+        
         # Facebook tracking params
-        "__tn__", "h", "c", "e", "s", "fref", "__xts__",
+        "__tn__", "h", "c", "e", "s", "fref", "__xts__", "locale",
+        
         # LinkedIn tracking params
         "trackingId", "trkEmail", "lipi", "lio", "licu",
+        
         # Instagram tracking params
         "igshid", "ig_rid", "ig_mid",
-        # Generic tracking
-        "tracking", "source", "campaign", "sa",
+        
+        # Twitter/X tracking params
+        "twclid", "twsrc", "twcamp", "twterm", "twgr", "cxt",
+        
+        # TikTok tracking params
+        "tt_content", "tt_medium", "tt_campaign",
+        
+        # Pinterest tracking params
+        "pp", "pin_campaign", "pin_contr", "pin_desc", "pin_create", "pin_tags",
+        
+        # Email tracking params
+        "eid", "erid", "etid", "ecid", "emid", "eaid", "epid", "esrc",
+        
+        # Generic tracking & analytics
+        "tracking", "source", "campaign", "sa", "sc", "tc", "data",
+        "affid", "affiliate", "aff", "cid", "cmpid", "cmp", "cp", "afftrack",
+        
+        # Campaign identifiers
+        "camp", "campaign_id", "cmp_id", "cta_id", "promo", "promotion",
+        
+        # Misc tracking
+        "device", "browser", "platform", "timestamp", "ts", "time", 
+        "country", "region", "location", "geo", "lat", "lon", "latlon",
+        
+        # Ad specific
+        "adgroup", "adset", "adid", "ad_id", "creative", "placement",
+        
+        # Internal tracking
+        "internal", "internal_ref", "flow", "flow_id", "journey",
+        
+        # Other common params
+        "ctaLabel", "variant", "exp", "experiment", "ab_test", "feature",
+        "cmpgn", "mtype", "mkt", "medium", "orig", "origin", "channel"
     }
 
     def __init__(
