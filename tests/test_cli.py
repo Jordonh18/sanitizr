@@ -197,8 +197,67 @@ def test_keyboard_interrupt():
     with mock.patch('sys.argv', ['sanitizr']):
         with mock.patch('sys.stdin', InterruptingStream()):
             with mock.patch('sys.stderr', new=io.StringIO()) as fake_stderr:
-                exit_code = main()
-                error_output = fake_stderr.getvalue()
+                with mock.patch('sys.stdout', new=io.StringIO()):
+                    exit_code = main()
+                    error_output = fake_stderr.getvalue()
     
     assert exit_code == 130
-    assert "Operation cancelled by user" in error_output
+    assert "Thank you for using Sanitizr URL Cleaner" in error_output
+
+
+def test_process_urls_interactive_mode():
+    """Test processing URLs in interactive mode with special commands."""
+    cleaner = URLCleaner()
+    # Simulate user entering help, a URL, and exit
+    input_stream = io.StringIO("help\nhttps://example.com?utm_source=test\nexit\n")
+    output_stream = io.StringIO()
+    
+    # Mock isatty to simulate terminal
+    input_stream.isatty = lambda: True
+    
+    process_urls(cleaner, input_stream, output_stream, interactive=True)
+    
+    output = output_stream.getvalue()
+    # Check for interactive mode elements
+    assert "URL>" in output
+    assert "Sanitizr URL Cleaner Help:" in output
+    assert "https://example.com" in output
+    assert "utm_source" not in output
+
+
+def test_version_flag():
+    """Test that -V shows version information."""
+    from sanitizr.sanitizr import __version__
+    
+    with mock.patch('sys.argv', ['sanitizr', '-V']):
+        with pytest.raises(SystemExit) as excinfo:
+            parse_args()
+    
+    # SystemExit with code 0 means the version was displayed correctly
+    assert excinfo.value.code == 0
+
+
+def test_interactive_mode_detection():
+    """Test that interactive mode is properly detected."""
+    # Save the original isatty method to restore it later
+    original_isatty = sys.stdin.isatty
+    
+    try:
+        # Mock isatty to pretend stdin is a terminal
+        sys.stdin.isatty = lambda: True
+        
+        with mock.patch('sys.argv', ['sanitizr']):
+            with mock.patch('sanitizr.sanitizr.cli.__main__.display_banner') as mock_banner:
+                with mock.patch('sanitizr.sanitizr.cli.__main__.process_urls') as mock_process:
+                    main()
+                    
+                    # Verify the banner was displayed
+                    mock_banner.assert_called_once()
+                    
+                    # Verify process_urls was called with interactive=True
+                    args, kwargs = mock_process.call_args
+                    assert kwargs.get('interactive', False) is True
+    
+    finally:
+        # Restore the original isatty method
+        sys.stdin.isatty = original_isatty

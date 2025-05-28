@@ -47,6 +47,38 @@ cat urls.txt | sanitizr > cleaned_urls.txt
 
 # Use verbose output to see the changes
 sanitizr -u "https://example.com?id=123&utm_source=newsletter" -v
+
+# Show version information
+sanitizr --version  # or simply: sanitizr -V
+
+# Interactive mode - just run without arguments
+sanitizr
+```
+
+#### Interactive Mode
+
+Running `sanitizr` without arguments starts an interactive session:
+
+```text
+╔═══════════════════════════════════╗
+║ Sanitizr URL Cleaner v1.0.1       ║
+║ Clean URLs by removing trackers   ║
+╚═══════════════════════════════════╝
+
+Enter URLs to clean (one per line). Press Ctrl+C to exit.
+Type 'help' for instructions or 'exit' to quit.
+
+URL> https://example.com?utm_source=newsletter&utm_medium=email
+https://example.com
+URL> help
+
+Sanitizr URL Cleaner Help:
+  Enter a URL to clean tracking parameters and decode redirects
+  Commands:
+    help - Show this help message
+    exit/quit - Exit the program
+
+URL> exit
 ```
 
 ### Python API

@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
-        help="Show verbose output (before and after URLs)."
+        help="Show verbose output with before/after comparison (not version, use -V for version)."
     )
     
     parser.add_argument(
@@ -58,11 +58,20 @@ def parse_args() -> argparse.Namespace:
     
     # Import at function level to avoid circular imports
     from .. import __version__
-    parser.add_argument(
+    
+    # Version flags - both --version and -V will show version
+    version_group = parser.add_argument_group('version')
+    version_group.add_argument(
         "--version",
         action="version",
         version=f"sanitizr {__version__}",
         help="Show program's version number and exit."
+    )
+    version_group.add_argument(
+        "-V",
+        action="version",
+        version=f"sanitizr {__version__}",
+        help="Show program's version number and exit (shorthand)."
     )
     
     return parser.parse_args()
@@ -74,6 +83,7 @@ def process_urls(
     output_stream: TextIO,
     dry_run: bool = False,
     verbose: bool = False,
+    interactive: bool = False,
 ) -> None:
     """
     Process URLs from input stream and write cleaned URLs to output stream.
@@ -84,16 +94,52 @@ def process_urls(
         output_stream: Output stream to write cleaned URLs to
         dry_run: If True, don't actually clean URLs, just show what would be done
         verbose: If True, show both original and cleaned URLs
+        interactive: If True, assume interactive mode with prompts
     """
+    # Check if we're dealing with an interactive terminal
+    is_interactive_term = interactive and hasattr(input_stream, 'isatty') and input_stream.isatty()
+    
+    # Show prompt for interactive mode
+    if is_interactive_term:
+        output_stream.write("Enter URLs to clean (one per line). Press Ctrl+C to exit.\n")
+        output_stream.write("Type 'help' for instructions or 'exit' to quit.\n\n")
+    
+    prompt = "URL> " if is_interactive_term else ""
+    
+    if prompt:
+        output_stream.write(prompt)
+        output_stream.flush()
+        
     for line in input_stream:
         line = line.strip()
+        
+        # Handle special commands in interactive mode
+        if interactive and line:
+            if line.lower() == 'exit' or line.lower() == 'quit':
+                break
+            elif line.lower() == 'help':
+                output_stream.write("\nSanitizr URL Cleaner Help:\n")
+                output_stream.write("  Enter a URL to clean tracking parameters and decode redirects\n")
+                output_stream.write("  Commands:\n")
+                output_stream.write("    help - Show this help message\n")
+                output_stream.write("    exit/quit - Exit the program\n\n")
+                output_stream.write(prompt)
+                output_stream.flush()
+                continue
+        
         if not line:
+            if is_interactive_term:
+                output_stream.write(prompt)
+                output_stream.flush()
             continue
             
         # Skip comments
         if line.startswith("#"):
             if not dry_run:
                 output_stream.write(f"{line}\n")
+            if is_interactive_term:
+                output_stream.write(prompt)
+                output_stream.flush()
             continue
             
         # Clean the URL
@@ -108,7 +154,21 @@ def process_urls(
                 output_stream.write(f"Unchanged: {line}\n\n")
         else:
             output_stream.write(f"{cleaned_url}\n")
+            
+        if is_interactive_term:
+            output_stream.write(prompt)
+            output_stream.flush()
 
+
+def display_banner() -> None:
+    """Display a banner with program info."""
+    from .. import __version__
+    print(f"""
+╔═══════════════════════════════════╗
+║ Sanitizr URL Cleaner v{__version__:<11} ║
+║ Clean URLs by removing trackers   ║
+╚═══════════════════════════════════╝
+""")
 
 def main() -> int:
     """Main entry point for the CLI."""
@@ -138,7 +198,14 @@ def main() -> int:
         else:
             print(cleaned_url)
         return 0
-        
+    
+    # Determine if we're in interactive mode (no args, stdin is a terminal)
+    interactive_mode = not args.input and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty()
+    
+    # Show banner in interactive mode
+    if interactive_mode:
+        display_banner()
+    
     # Set up input stream
     try:
         if args.input:
@@ -168,10 +235,11 @@ def main() -> int:
             input_stream,
             output_stream,
             dry_run=args.dry_run,
-            verbose=args.verbose
+            verbose=args.verbose,
+            interactive=interactive_mode
         )
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user.", file=sys.stderr)
+        print("\nThank you for using Sanitizr URL Cleaner!", file=sys.stderr)
         return 130  # Standard exit code for SIGINT
     except Exception as e:
         print(f"Error processing URLs: {e}", file=sys.stderr)
