@@ -23,6 +23,9 @@ class URLCleaner:
     # Known redirect parameters by domain
     DEFAULT_REDIRECT_PARAMS = {
         "google.com": ["url", "q"],
+        "googleadservices.com": ["adurl", "url", "destination"],
+        "googlesyndication.com": ["adurl", "url", "destination"],
+        "doubleclick.net": ["adurl", "url", "destination"],
         "facebook.com": ["u"],
         "l.facebook.com": ["u"],
         "lm.facebook.com": ["u"],
@@ -42,7 +45,6 @@ class URLCleaner:
         # Common ad and tracking providers
         "adsprovider.net": ["redirect", "url", "goto", "link", "destination"],
         "track.adsprovider.net": ["redirect", "url", "goto", "link", "destination", "data"],
-        "doubleclick.net": ["url", "adurl", "destination"],
         "clickserve.dartsearch.net": ["ds_dest_url", "url"],
         "adservice.google.com": ["url", "adurl"],
         "ad.doubleclick.net": ["adurl", "url", "rd", "destination"],
@@ -51,6 +53,11 @@ class URLCleaner:
         "ads.facebook.com": ["u", "url", "destination"],
         "googleads.g.doubleclick.net": ["adurl", "url"],
         "adsrv.org": ["u", "url", "redirect", "destination"],
+        
+        # Additional redirect services
+        "redirector.adclick.com": ["data", "url", "redirect", "goto"],
+        "trackinghub.com": ["redirect", "url", "goto", "link", "destination"],
+        "ads.trackinghub.com": ["redirect", "url", "goto", "link", "destination"],
     }
 
     # Regex patterns for extracting URLs from complex redirects
@@ -75,8 +82,8 @@ class URLCleaner:
         "yclid", "dclid", "_hsenc", "_hsmi", "igshid", "mkt_tok", "clickid",
         "msclkid", "twclid", "dicbo", "gbraid", "wbraid", "gbraid_tw",
         
-        # Session and visitor IDs
-        "sessionid", "session_id", "visitor_id", "visitorid", "visitor",
+        # Session and visitor IDs (be conservative - some might be functional)
+        "session_id", "visitor_id", "visitorid", "visitor",
         
         # Social tracking
         "soc_src", "soc_trk", "wt_mc", "WT.mc_id", "ref", "referrer", "src",
@@ -123,7 +130,44 @@ class URLCleaner:
         
         # Other common params
         "ctaLabel", "variant", "exp", "experiment", "ab_test", "feature",
-        "cmpgn", "mtype", "mkt", "medium", "orig", "origin", "channel"
+        "cmpgn", "mtype", "mkt", "medium", "orig", "origin", "channel",
+        
+        # Affiliate and referral tracking
+        "tag", "ref_", "asc_source", "linkId", "linkid", "ref", "ascsubtag",
+        "asc_refurl", "asc_campaign", "th", "psc", "ref_tag", "ref_src",
+        
+        # Amazon specific affiliate parameters (but keep core product info)
+        "tag", "linkCode", "linkId", "ref_", "th", "psc", "keywords",
+        "ie", "qid", "sr", "ref", "pf_rd_r", "pf_rd_p", "pf_rd_s",
+        "pf_rd_t", "pf_rd_i", "pf_rd_m", "pd_rd_r", "pd_rd_w", "pd_rd_wg",
+        "asc_source", "ascsubtag", "asc_refurl", "asc_campaign",
+    }
+    
+    # Important parameters that should usually be kept (whitelist candidates)
+    IMPORTANT_PARAMS = {
+        # YouTube
+        "v", "t", "list", "index", "start", "end",
+        
+        # Amazon product identification
+        "dp", "asin", "gp",
+        
+        # Search and filter parameters
+        "q", "search", "query", "filter", "sort", "category", "type",
+        
+        # Page navigation
+        "page", "p", "offset", "limit", "per_page", "pagesize",
+        
+        # Product/content identification
+        "id", "sku", "pid", "item", "product", "article", "post",
+        
+        # Geographic/language settings (functional, not tracking)
+        "lang", "language", "locale", "currency", "cc", "gl",
+        
+        # Functional parameters
+        "format", "version", "mode", "view", "tab", "section",
+        
+        # Session parameters (functional, not tracking)
+        "sessionid", "jsessionid", "phpsessid",
     }
 
     def __init__(
@@ -152,6 +196,7 @@ class URLCleaner:
         """
         self.tracking_params = self.DEFAULT_TRACKING_PARAMS.copy()
         self.redirect_params = self.DEFAULT_REDIRECT_PARAMS.copy()
+        self.important_params = self.IMPORTANT_PARAMS.copy()
         self.enable_generic_redirect_handling = enable_generic_redirect_handling
         self.enable_heuristic_detection = enable_heuristic_detection
         self.max_redirection_depth = max_redirection_depth
@@ -173,7 +218,8 @@ class URLCleaner:
             "next", "to", "out", "jump", "return", "continue", "follow",
             "location", "href", "path", "navigate", "forward", "proceed",
             "uri", "source", "destination", "redir", "rurl", "r_url", "returnurl",
-            "redirect_uri", "redirect_url", "redirecturl", "return_url", "returnto"
+            "redirect_uri", "redirect_url", "redirecturl", "return_url", "returnto",
+            "adurl", "ads_url", "ad_url", "data", "payload"
         ]
         
         # Generate the regex pattern for fragment and query redirection
@@ -471,7 +517,7 @@ class URLCleaner:
     
     def _extract_from_params(self, query: str, params: List[str]) -> Optional[str]:
         """
-        Extract a URL from query parameters.
+        Extract a URL from query parameters with enhanced support for encoded and nested URLs.
         
         Args:
             query: Query string to parse
@@ -490,13 +536,14 @@ class URLCleaner:
             # Case-insensitive parameter matching
             lower_query_params = {k.lower(): v for k, v in query_params.items()}
             
-            for param in params:
+            # Enhanced parameter list - add common base64 and data parameters
+            enhanced_params = params + ['data', 'payload', 'content', 'encoded', 'b64url']
+            
+            for param in enhanced_params:
                 # Try exact match first
                 if param in query_params and query_params[param]:
                     redirect_url = query_params[param][0]
-                    redirect_url = self._try_url_decode(redirect_url)
-                    
-                    processed_url = self._process_extracted_url(redirect_url)
+                    processed_url = self._process_potential_url(redirect_url)
                     if processed_url:
                         return processed_url
                 
@@ -506,9 +553,7 @@ class URLCleaner:
                     for k, v in query_params.items():
                         if k.lower() == param_lower:
                             redirect_url = v[0]
-                            redirect_url = self._try_url_decode(redirect_url)
-                            
-                            processed_url = self._process_extracted_url(redirect_url)
+                            processed_url = self._process_potential_url(redirect_url)
                             if processed_url:
                                 return processed_url
             
@@ -516,9 +561,42 @@ class URLCleaner:
         except Exception:
             return None
             
+    def _process_potential_url(self, url_candidate: str) -> Optional[str]:
+        """
+        Process a potential URL that might be encoded, nested, or in various formats.
+        
+        Args:
+            url_candidate: The string that might contain a URL
+            
+        Returns:
+            Valid URL or None if invalid
+        """
+        if not url_candidate:
+            return None
+            
+        # Step 1: Try URL decoding (handles nested URL encoding and base64)
+        decoded_url = self._try_url_decode(url_candidate)
+        
+        # Step 2: Try to process as a regular URL
+        processed_url = self._process_extracted_url(decoded_url)
+        if processed_url:
+            return processed_url
+            
+        # Step 3: If direct processing failed, check if it's base64 encoded
+        if self._is_base64_encoded(url_candidate):
+            base64_decoded = self._try_base64_decode(url_candidate)
+            if base64_decoded:
+                # Try URL decoding the base64 result
+                further_decoded = self._try_url_decode(base64_decoded)
+                processed_url = self._process_extracted_url(further_decoded)
+                if processed_url:
+                    return processed_url
+        
+        return None
+            
     def _process_extracted_url(self, url: str) -> Optional[str]:
         """
-        Process an extracted URL to make it valid.
+        Process an extracted URL to make it valid, with enhanced validation.
         
         Args:
             url: The extracted URL string
@@ -532,15 +610,60 @@ class URLCleaner:
         # Try to fix common URL format issues
         url = self._normalize_url(url)
         
-        # Validate URL
+        # Enhanced validation to prevent malformed URLs
         try:
             parsed_url = urllib.parse.urlparse(url)
-            if parsed_url.scheme and parsed_url.netloc:
-                return url
-        except Exception:
-            pass
             
-        return None
+            # Must have both scheme and netloc
+            if not parsed_url.scheme or not parsed_url.netloc:
+                return None
+                
+            # Netloc should not be just a port number or look suspicious
+            if self._is_malformed_netloc(parsed_url.netloc):
+                return None
+                
+            # Basic domain validation - should contain at least one dot or be localhost
+            if '.' not in parsed_url.netloc and parsed_url.netloc not in ['localhost']:
+                return None
+                
+            return url
+        except Exception:
+            return None
+    
+    def _is_malformed_netloc(self, netloc: str) -> bool:
+        """
+        Check if a netloc (domain) appears to be malformed.
+        
+        Args:
+            netloc: The network location part of the URL
+            
+        Returns:
+            True if the netloc appears malformed
+        """
+        if not netloc:
+            return True
+            
+        # Remove port if present
+        domain_part = netloc.split(':')[0]
+        
+        # Check if it's just a number (like "9090" from the examples)
+        if domain_part.isdigit():
+            return True
+            
+        # Check if it looks like a parameter value rather than domain
+        # (e.g., "abc-def-ghi" from the Amazon example)
+        if '-' in domain_part and not '.' in domain_part:
+            # If it's all lowercase letters/numbers with hyphens and no dots, likely not a domain
+            import string
+            allowed_chars = string.ascii_lowercase + string.digits + '-'
+            if all(c in allowed_chars for c in domain_part.lower()) and len(domain_part) > 10:
+                return True
+                
+        # Check for other suspicious patterns
+        if domain_part.startswith('-') or domain_part.endswith('-'):
+            return True
+            
+        return False
     
     def _normalize_url(self, url: str) -> str:
         """
@@ -585,9 +708,70 @@ class URLCleaner:
                 
         return url
     
+    def _is_base64_encoded(self, text: str) -> bool:
+        """
+        Check if a string appears to be base64 encoded.
+        
+        Args:
+            text: The string to check
+            
+        Returns:
+            True if the string appears to be base64 encoded
+        """
+        if not text or len(text) < 4:
+            return False
+            
+        # Base64 strings should be multiple of 4 in length (with padding)
+        if len(text) % 4 != 0:
+            return False
+            
+        # Base64 uses only these characters
+        import string
+        base64_chars = string.ascii_letters + string.digits + '+/='
+        if not all(c in base64_chars for c in text):
+            return False
+            
+        # Additional heuristic: base64 URLs often contain encoded :// which is Oi8v
+        # or encoded http which starts with aHR0c
+        base64_url_indicators = ['aHR0c', 'Oi8v', 'JTNBJTJGJTJG']
+        if any(indicator in text for indicator in base64_url_indicators):
+            return True
+            
+        # If it's long enough and matches base64 pattern, it's likely base64
+        return len(text) >= 16
+
+    def _try_base64_decode(self, text: str) -> Optional[str]:
+        """
+        Attempt to decode a base64 string and return it if it looks like a URL.
+        
+        Args:
+            text: The potentially base64-encoded string
+            
+        Returns:
+            Decoded string if successful and URL-like, None otherwise
+        """
+        try:
+            # Add padding if needed
+            padded_text = text
+            while len(padded_text) % 4 != 0:
+                padded_text += '='
+                
+            decoded_bytes = base64.b64decode(padded_text)
+            decoded_str = decoded_bytes.decode('utf-8', errors='ignore')
+            
+            # Check if decoded string looks like a URL
+            if any(indicator in decoded_str.lower() for indicator in ['http:', 'https:', 'www.', '://']):
+                return decoded_str
+                
+        except Exception:
+            pass
+            
+        return None
+
     def _try_url_decode(self, url: str) -> str:
         """
         Attempt to URL-decode a string, potentially multiple times for deeply encoded URLs.
+        Also handles base64-encoded URLs.
         
         Args:
             url: The potentially encoded URL
@@ -604,11 +788,27 @@ class URLCleaner:
         
         while prev_url != current_url and attempts < max_attempts:
             prev_url = current_url
+            
+            # First try URL decoding
             try:
-                current_url = urllib.parse.unquote_plus(current_url)
+                decoded = urllib.parse.unquote_plus(current_url)
+                if decoded != current_url:
+                    current_url = decoded
+                    attempts += 1
+                    continue
             except Exception:
-                break
-            attempts += 1
+                pass
+                
+            # If URL decoding didn't change anything, try base64 decoding
+            if self._is_base64_encoded(current_url):
+                base64_decoded = self._try_base64_decode(current_url)
+                if base64_decoded and base64_decoded != current_url:
+                    current_url = base64_decoded
+                    attempts += 1
+                    continue
+                    
+            # If neither URL nor base64 decoding changed anything, we're done
+            break
             
         return current_url
             
@@ -634,7 +834,7 @@ class URLCleaner:
     
     def _clean_parameters(self, url: str) -> str:
         """
-        Remove tracking parameters from a URL.
+        Remove tracking parameters from a URL with improved logic for important parameters.
         
         Args:
             url: The URL to clean
@@ -650,14 +850,29 @@ class URLCleaner:
             # Parse query parameters
             query_params = urllib.parse.parse_qs(parsed_url.query)
             
-            # Filter parameters
+            # Filter parameters with improved logic
             filtered_params = {}
             for param, values in query_params.items():
-                # Keep parameter if it's whitelisted
+                should_keep = False
+                
+                # Always keep if explicitly whitelisted
                 if param in self.whitelist_params:
-                    filtered_params[param] = values
-                # Remove parameter if it's blacklisted or in tracking params
-                elif param not in self.blacklist_params and param not in self.tracking_params:
+                    should_keep = True
+                # Always remove if explicitly blacklisted
+                elif param in self.blacklist_params:
+                    should_keep = False
+                # Keep important functional parameters
+                elif param in self.important_params:
+                    should_keep = True
+                # Remove known tracking parameters
+                elif param in self.tracking_params:
+                    should_keep = False
+                # For unknown parameters, use a more conservative approach
+                else:
+                    # Keep parameters that don't look like tracking
+                    should_keep = not self._looks_like_tracking_param(param)
+                
+                if should_keep:
                     filtered_params[param] = values
                     
             # Rebuild the query string
@@ -676,6 +891,39 @@ class URLCleaner:
             return clean_url
         except Exception:
             return url
+    
+    def _looks_like_tracking_param(self, param: str) -> bool:
+        """
+        Heuristically determine if a parameter looks like a tracking parameter.
+        
+        Args:
+            param: The parameter name to check
+            
+        Returns:
+            True if it looks like a tracking parameter
+        """
+        param_lower = param.lower()
+        
+        # Common tracking patterns
+        tracking_patterns = [
+            'utm_', 'ga_', 'fb', 'gclid', 'click', 'track', 'campaign',
+            'source', 'medium', '_id', 'ref_', 'aff', 'promo', 'cmp',
+            'ads', 'ad_', 'marketing', 'affiliate', 'partner', 'tag_'
+        ]
+        
+        # Check if parameter name contains tracking patterns
+        for pattern in tracking_patterns:
+            if pattern in param_lower:
+                return True
+                
+        # Check for ID-like parameters that are often tracking
+        if param_lower.endswith('id') and len(param) > 3:
+            # But not functional IDs like 'id', 'pid', 'uid' (user content)
+            functional_ids = ['id', 'pid', 'uid', 'sid', 'sku']
+            if param_lower not in functional_ids:
+                return True
+                
+        return False
     
     def _detect_redirect_params(self, parsed_url: urllib.parse.ParseResult) -> List[str]:
         """
